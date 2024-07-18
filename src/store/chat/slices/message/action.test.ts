@@ -4,7 +4,7 @@ import useSWR, { mutate } from 'swr';
 import { Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LOADING_FLAT } from '@/const/message';
-import { DEFAULT_AGENT_CONFIG } from '@/const/settings';
+import { DEFAULT_AGENT_CHAT_CONFIG, DEFAULT_AGENT_CONFIG } from '@/const/settings';
 import { TraceEventType } from '@/const/trace';
 import { chatService } from '@/services/chat';
 import { messageService } from '@/services/message';
@@ -30,6 +30,7 @@ vi.mock('@/services/message', () => ({
     getMessages: vi.fn(),
     updateMessageError: vi.fn(),
     removeMessage: vi.fn(),
+    removeMessagesByAssistant: vi.fn(),
     removeMessages: vi.fn(() => Promise.resolve()),
     createMessage: vi.fn(() => Promise.resolve('new-message-id')),
     updateMessage: vi.fn(),
@@ -70,6 +71,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   useChatStore.setState(mockState, false);
   vi.spyOn(agentSelectors, 'currentAgentConfig').mockImplementation(() => DEFAULT_AGENT_CONFIG);
+  vi.spyOn(agentSelectors, 'currentAgentChatConfig').mockImplementation(
+    () => DEFAULT_AGENT_CHAT_CONFIG,
+  );
   vi.spyOn(sessionMetaSelectors, 'currentAgentMeta').mockImplementation(() => ({ tags: [] }));
 });
 
@@ -143,6 +147,124 @@ describe('chatMessage actions', () => {
 
       expect(deleteSpy).toHaveBeenCalledWith(messageId);
       expect(result.current.refreshMessages).toHaveBeenCalled();
+    });
+
+    it('deleteMessage should remove messages with tools', async () => {
+      const { result } = renderHook(() => useChatStore());
+      const messageId = 'message-id';
+      const removeMessagesSpy = vi.spyOn(messageService, 'removeMessages');
+
+      act(() => {
+        useChatStore.setState({
+          activeId: 'session-id',
+          activeTopicId: undefined,
+          messagesMap: {
+            [messageMapKey('session-id')]: [
+              { id: messageId, tools: [{ id: 'tool1' }, { id: 'tool2' }] } as ChatMessage,
+              { id: '2', tool_call_id: 'tool1', role: 'tool' } as ChatMessage,
+              { id: '3', tool_call_id: 'tool2', role: 'tool' } as ChatMessage,
+            ],
+          },
+        });
+      });
+      await act(async () => {
+        await result.current.deleteMessage(messageId);
+      });
+
+      expect(removeMessagesSpy).toHaveBeenCalledWith([messageId, '2', '3']);
+      expect(result.current.refreshMessages).toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteToolMessage', () => {
+    it('deleteMessage should remove a message by id', async () => {
+      const { result } = renderHook(() => useChatStore());
+      const messageId = 'message-id';
+      const updateMessageSpy = vi.spyOn(messageService, 'updateMessage');
+      const removeMessageSpy = vi.spyOn(messageService, 'removeMessage');
+
+      act(() => {
+        useChatStore.setState({
+          activeId: 'session-id',
+          activeTopicId: undefined,
+          messagesMap: {
+            [messageMapKey('session-id')]: [
+              {
+                id: messageId,
+                role: 'assistant',
+                tools: [{ id: 'tool1' }, { id: 'tool2' }],
+              } as ChatMessage,
+              { id: '2', parentId: messageId, tool_call_id: 'tool1', role: 'tool' } as ChatMessage,
+              { id: '3', tool_call_id: 'tool2', role: 'tool' } as ChatMessage,
+            ],
+          },
+        });
+      });
+      await act(async () => {
+        await result.current.deleteToolMessage('2');
+      });
+
+      expect(removeMessageSpy).toHaveBeenCalled();
+      expect(updateMessageSpy).toHaveBeenCalledWith('message-id', {
+        tools: [{ id: 'tool2' }],
+      });
+      expect(result.current.refreshMessages).toHaveBeenCalled();
+    });
+  });
+
+  describe('delAndRegenerateMessage', () => {
+    it('should remove a message and create a new message', async () => {
+      const { result } = renderHook(() => useChatStore());
+      const messageId = 'message-id';
+      const deleteMessageSpy = vi.spyOn(result.current, 'deleteMessage');
+      const resendMessageSpy = vi.spyOn(result.current, 'internal_resendMessage');
+
+      act(() => {
+        useChatStore.setState({
+          activeId: 'session-id',
+          activeTopicId: undefined,
+          messagesMap: {
+            [messageMapKey('session-id')]: [
+              { id: messageId, tools: [{ id: 'tool1' }, { id: 'tool2' }] } as ChatMessage,
+            ],
+          },
+        });
+      });
+      await act(async () => {
+        await result.current.delAndRegenerateMessage(messageId);
+      });
+
+      expect(deleteMessageSpy).toHaveBeenCalledWith(messageId);
+      expect(resendMessageSpy).toHaveBeenCalled();
+      expect(result.current.refreshMessages).toHaveBeenCalled();
+    });
+  });
+  describe('regenerateMessage', () => {
+    it('should create a new message', async () => {
+      const { result } = renderHook(() => useChatStore());
+      const messageId = 'message-id';
+      const resendMessageSpy = vi.spyOn(result.current, 'internal_resendMessage');
+
+      act(() => {
+        useChatStore.setState({
+          activeId: 'session-id',
+          activeTopicId: undefined,
+          messagesMap: {
+            [messageMapKey('session-id')]: [
+              {
+                id: messageId,
+                tools: [{ id: 'tool1' }, { id: 'tool2' }],
+                traceId: 'abc',
+              } as ChatMessage,
+            ],
+          },
+        });
+      });
+      await act(async () => {
+        await result.current.regenerateMessage(messageId);
+      });
+
+      expect(resendMessageSpy).toHaveBeenCalledWith(messageId, 'abc');
     });
   });
 
@@ -416,11 +538,17 @@ describe('chatMessage actions', () => {
         const { result } = renderHook(() => useChatStore());
         act(() => {
           useAgentStore.setState({
-            agentConfig: {
-              enableAutoCreateTopic: false,
-              autoCreateTopicThreshold: 1,
+            activeId: 'abc',
+            agentMap: {
+              abc: {
+                chatConfig: {
+                  enableAutoCreateTopic: false,
+                  autoCreateTopicThreshold: 1,
+                },
+              },
             },
           });
+
           useChatStore.setState({
             // Mock the currentChats selector to return a list that does not reach the threshold
             messagesMap: {
@@ -447,7 +575,7 @@ describe('chatMessage actions', () => {
         (messageService.createMessage as Mock).mockResolvedValue('new-message-id');
 
         // Mock agent config to simulate auto-create topic behavior
-        (agentSelectors.currentAgentConfig as Mock).mockImplementation(() => ({
+        (agentSelectors.currentAgentChatConfig as Mock).mockImplementation(() => ({
           autoCreateTopicThreshold,
           enableAutoCreateTopic,
         }));
@@ -742,7 +870,7 @@ describe('chatMessage actions', () => {
 
       expect(internal_dispatchMessageSpy).toHaveBeenCalledWith({
         id: messageId,
-        type: 'updateMessages',
+        type: 'updateMessage',
         value: { content: newContent },
       });
     });
@@ -1132,6 +1260,31 @@ describe('chatMessage actions', () => {
       });
 
       expect(result.current.messageLoadingIds).not.toContain(messageId);
+    });
+  });
+
+  describe('internal_toggleToolCallingStreaming action', () => {
+    it('should add message id to messageLoadingIds when loading is true', () => {
+      const { result } = renderHook(() => useChatStore());
+      const messageId = 'message-id';
+
+      act(() => {
+        result.current.internal_toggleToolCallingStreaming(messageId, [true]);
+      });
+
+      expect(result.current.toolCallingStreamIds[messageId]).toEqual([true]);
+    });
+
+    it('should remove message id from messageLoadingIds when loading is false', () => {
+      const { result } = renderHook(() => useChatStore());
+      const messageId = 'ddd-id';
+
+      act(() => {
+        result.current.internal_toggleToolCallingStreaming(messageId, [true]);
+        result.current.internal_toggleToolCallingStreaming(messageId, undefined);
+      });
+
+      expect(result.current.toolCallingStreamIds[messageId]).toBeUndefined();
     });
   });
 

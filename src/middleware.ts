@@ -1,4 +1,4 @@
-import { clerkMiddleware } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
 import { authEnv } from '@/config/auth';
@@ -12,6 +12,9 @@ export const config = {
     '/(api|trpc)(.*)',
     // include the /
     '/',
+    '/chat(.*)',
+    '/settings(.*)',
+    // ↓ cloud ↓
   ],
 };
 
@@ -40,17 +43,23 @@ const nextAuthMiddleware = auth((req) => {
   });
 });
 
-export default authEnv.NEXT_PUBLIC_ENABLE_CLERK_AUTH
-  ? // can't lift to a function because if there is no clerk public key, it will throw error
-    clerkMiddleware((auth, request) => {
-      // if user is logged in and on the home page, redirect to chat
-      if (auth().userId && request.nextUrl.pathname === '/') {
-        request.nextUrl.pathname = '/chat';
-        return NextResponse.redirect(request.nextUrl);
-      }
+const isProtectedRoute = createRouteMatcher([
+  '/settings(.*)',
+  // ↓ cloud ↓
+]);
 
-      return NextResponse.next();
-    })
+export default authEnv.NEXT_PUBLIC_ENABLE_CLERK_AUTH
+  ? clerkMiddleware(
+      (auth, req) => {
+        if (isProtectedRoute(req)) auth().protect();
+      },
+      {
+        // https://github.com/lobehub/lobe-chat/pull/3084
+        clockSkewInMs: 60 * 60 * 1000,
+        signInUrl: '/login',
+        signUpUrl: '/signup',
+      },
+    )
   : authEnv.NEXT_PUBLIC_ENABLE_NEXT_AUTH
     ? nextAuthMiddleware
     : defaultMiddleware;

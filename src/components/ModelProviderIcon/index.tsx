@@ -1,10 +1,14 @@
 import {
+  Ai360,
+  AiMass,
   Anthropic,
   Azure,
+  Baichuan,
   Bedrock,
   DeepSeek,
   Google,
   Groq,
+  LobeHub,
   Minimax,
   Mistral,
   Moonshot,
@@ -12,11 +16,12 @@ import {
   OpenAI,
   OpenRouter,
   Perplexity,
+  Stepfun,
   Together,
+  Tongyi,
   ZeroOne,
   Zhipu,
 } from '@lobehub/icons';
-import { Logo } from '@lobehub/ui';
 import { memo } from 'react';
 import { Center } from 'react-layout-kit';
 
@@ -29,7 +34,7 @@ interface ModelProviderIconProps {
 const ModelProviderIcon = memo<ModelProviderIconProps>(({ provider }) => {
   switch (provider) {
     case 'lobehub': {
-      return <Logo size={20} />;
+      return <LobeHub.Color size={20} />;
     }
 
     case ModelProvider.ZhiPu: {
@@ -102,6 +107,26 @@ const ModelProviderIcon = memo<ModelProviderIconProps>(({ provider }) => {
 
     case ModelProvider.TogetherAI: {
       return <Together size={20} />;
+    }
+
+    case ModelProvider.Qwen: {
+      return <Tongyi size={20} />;
+    }
+
+    case ModelProvider.Stepfun: {
+      return <Stepfun size={20} />;
+    }
+
+    case ModelProvider.Baichuan: {
+      return <Baichuan size={20} />;
+    }
+
+    case ModelProvider.Taichu: {
+      return <AiMass size={20} />;
+    }
+
+    case ModelProvider.Ai360: {
+      return <Ai360 size={20} />;
     }
 
     default: {

@@ -79,10 +79,10 @@ export const ModelInfoTags = memo<ModelInfoTagsProps>(
     return (
       <Flexbox direction={directionReverse ? 'horizontal-reverse' : 'horizontal'} gap={4}>
         {model.files && (
-          <Tooltip 
+          <Tooltip
             overlayStyle={{ pointerEvents: 'none' }}
-            placement={placement} 
-            title={t('ModelSelect.featureTag.file')} 
+            placement={placement}
+            title={t('ModelSelect.featureTag.file')}
           >
             <div className={cx(styles.tag, styles.tagGreen)} style={{ cursor: 'pointer' }} title="">
               <Icon icon={LucidePaperclip} />
@@ -90,9 +90,9 @@ export const ModelInfoTags = memo<ModelInfoTagsProps>(
           </Tooltip>
         )}
         {model.vision && (
-          <Tooltip 
+          <Tooltip
             overlayStyle={{ pointerEvents: 'none' }}
-            placement={placement} 
+            placement={placement}
             title={t('ModelSelect.featureTag.vision')}
           >
             <div className={cx(styles.tag, styles.tagGreen)} style={{ cursor: 'pointer' }} title="">
@@ -128,15 +128,6 @@ export const ModelInfoTags = memo<ModelInfoTagsProps>(
             </Center>
           </Tooltip>
         )}
-        {/*{model.isCustom && (*/}
-        {/*  <Tooltip*/}
-        {/*    overlayStyle={{ maxWidth: 300 }}*/}
-        {/*    placement={placement}*/}
-        {/*    title={t('ModelSelect.featureTag.custom')}*/}
-        {/*  >*/}
-        {/*    <Center className={styles.custom}>DIY</Center>*/}
-        {/*  </Tooltip>*/}
-        {/*)}*/}
       </Flexbox>
     );
   },
@@ -160,16 +151,13 @@ export const ModelItemRender = memo<ModelItemRenderProps>(({ showInfoTag = true,
 });
 
 interface ProviderItemRenderProps {
+  name: string;
   provider: string;
 }
 
-export const ProviderItemRender = memo<ProviderItemRenderProps>(({ provider }) => {
-  const { t } = useTranslation('modelProvider');
-
-  return (
-    <Flexbox align={'center'} gap={4} horizontal>
-      <ModelProviderIcon provider={provider} />
-      {t(`${provider}.title` as any)}
-    </Flexbox>
-  );
-});
+export const ProviderItemRender = memo<ProviderItemRenderProps>(({ provider, name }) => (
+  <Flexbox align={'center'} gap={4} horizontal>
+    <ModelProviderIcon provider={provider} />
+    {name}
+  </Flexbox>
+));

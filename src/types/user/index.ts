@@ -1,3 +1,7 @@
+import { DeepPartial } from 'utility-types';
+
+import { UserSettings } from '@/types/user/settings';
+
 export interface LobeUser {
   avatar?: string;
   email?: string | null;
@@ -14,7 +18,9 @@ export interface UserGuide {
    */
   moveSettingsToAvatar?: boolean;
 
-  // Topic 引导
+  /**
+   * Topic Guide
+   */
   topic?: boolean;
 }
 
@@ -26,4 +32,15 @@ export interface UserPreference {
    * whether to use cmd + enter to send message
    */
   useCmdEnterToSend?: boolean;
+}
+
+export interface UserInitializationState {
+  avatar?: string;
+  canEnablePWAGuide?: boolean;
+  canEnableTrace?: boolean;
+  hasConversation?: boolean;
+  isOnboard?: boolean;
+  preference: UserPreference;
+  settings: DeepPartial<UserSettings>;
+  userId?: string;
 }
